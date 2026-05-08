@@ -1,4 +1,4 @@
-# CLIPMIND
+# Clip_Mind
 
 AI-powered video and meeting intelligence assistant.
 
