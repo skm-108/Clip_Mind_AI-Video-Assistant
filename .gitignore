@@ -1,0 +1,17 @@
+.env
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+*$py.class
+
+generated_audio/
+downloades/
+vector_db/
+
+*.log
+last_error.log
+streamlit*.log
+
+.vscode/
+.idea/
