@@ -24,14 +24,39 @@ def get_llm():
 
 
 def split_transcript(transcript: str) -> list:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 3000,
-        chunk_overlap = 200
-    )
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=3000,
+            chunk_overlap=200,
+        )
 
-    return splitter.split_text(transcript)
+        return splitter.split_text(transcript)
+    except ModuleNotFoundError:
+        # Fallback splitter: split by paragraphs and sentences to approximate chunks
+        pieces = [p.strip() for p in re.split(r"\n{2,}", transcript) if p.strip()]
+        if not pieces:
+            pieces = [s.strip() for s in re.split(r'(?<=[.!?]) +', transcript) if s.strip()]
+
+        chunks = []
+        current = ""
+        for piece in pieces:
+            if len(current) + len(piece) + 2 <= 3000:
+                current = (current + "\n\n" + piece).strip()
+            else:
+                if current:
+                    chunks.append(current)
+                if len(piece) <= 3000:
+                    current = piece
+                else:
+                    # Hard split long piece
+                    for i in range(0, len(piece), 3000 - 200):
+                        chunks.append(piece[i : i + (3000 - 200)])
+                    current = ""
+        if current:
+            chunks.append(current)
+        return chunks
 
 
 def _simple_summary(transcript: str, max_sentences: int = 5) -> str:
