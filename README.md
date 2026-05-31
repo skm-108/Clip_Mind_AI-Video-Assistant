@@ -84,6 +84,8 @@ python -m pip install audioop-lts
 winget install Gyan.FFmpeg
 ```
 
+Cloud note: the app now falls back to a bundled FFmpeg binary via `imageio-ffmpeg` when a system FFmpeg is not available, so Streamlit Cloud does not need a manual FFmpeg install.
+
 Edit .env and set your real keys:
 - MISTRAL_API_KEY
 - SARVAM_API_KEY (required only for hinglish mode)
@@ -152,7 +154,8 @@ For Streamlit Cloud, add the same values under app settings secrets instead of c
 ## Common Issues
 
 1. FFmpeg not found
-- Install FFmpeg or set FFMPEG_BIN in .env
+- Install FFmpeg locally or set `FFMPEG_BIN` in `.env`
+- On Streamlit Cloud the bundled fallback should be used automatically
 
 2. Sarvam errors for long audio
 - The code already slices audio into short pieces before API calls

@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import uuid
+from contextlib import suppress
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -10,10 +11,24 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
+FFMPEG_EXECUTABLE = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+FFPROBE_EXECUTABLE = "ffprobe.exe" if os.name == "nt" else "ffprobe"
+
 
 def _valid_ffmpeg_dir(path: str | None) -> str | None:
-    if path and os.path.exists(os.path.join(path, "ffmpeg.exe")):
+    if path and os.path.exists(os.path.join(path, FFMPEG_EXECUTABLE)):
         return path
+    return None
+
+
+def _resolve_bundled_ffmpeg_bin() -> str | None:
+    with suppress(ModuleNotFoundError):
+        import imageio_ffmpeg
+
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if ffmpeg_exe and os.path.exists(ffmpeg_exe):
+            return os.path.dirname(ffmpeg_exe)
+
     return None
 
 
@@ -25,6 +40,14 @@ def _resolve_ffmpeg_bin() -> str | None:
     path_ffmpeg = shutil.which("ffmpeg")
     if path_ffmpeg:
         return os.path.dirname(path_ffmpeg)
+
+    path_ffprobe = shutil.which("ffprobe")
+    if path_ffprobe:
+        return os.path.dirname(path_ffprobe)
+
+    bundled_path = _resolve_bundled_ffmpeg_bin()
+    if bundled_path:
+        return bundled_path
 
     winget_path = (
         r"C:\Users\ssssh\AppData\Local\Microsoft\WinGet\Packages"
@@ -52,8 +75,11 @@ def _configure_pydub_ffmpeg() -> None:
     if not AudioSegment or not FFMPEG_BIN:
         return
 
-    AudioSegment.converter = os.path.join(FFMPEG_BIN, "ffmpeg.exe")
-    AudioSegment.ffprobe = os.path.join(FFMPEG_BIN, "ffprobe.exe")
+    converter_path = os.path.join(FFMPEG_BIN, FFMPEG_EXECUTABLE)
+    ffprobe_path = os.path.join(FFMPEG_BIN, FFPROBE_EXECUTABLE)
+
+    AudioSegment.converter = converter_path
+    AudioSegment.ffprobe = ffprobe_path if os.path.exists(ffprobe_path) else converter_path
 
 
 _configure_pydub_ffmpeg()
@@ -68,7 +94,7 @@ def _require_audio_segment():
 
 
 def ensure_ffmpeg_available() -> None:
-    if FFMPEG_BIN or shutil.which("ffmpeg"):
+    if FFMPEG_BIN or shutil.which("ffmpeg") or shutil.which("ffprobe"):
         return
     raise RuntimeError(
         "FFmpeg not found. Install FFmpeg or set FFMPEG_BIN in .env to the folder containing ffmpeg.exe."
