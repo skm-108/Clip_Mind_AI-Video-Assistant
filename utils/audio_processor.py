@@ -84,6 +84,17 @@ def _safe_stem(path: str, max_length: int = 48) -> str:
     return f"{stem}_{digest}"
 
 
+def _looks_like_pasted_error_text(source: str) -> bool:
+    lowered = source.lower()
+    return (
+        "\n" in source
+        or "traceback (most recent call last):" in lowered
+        or "modulenotfounderror:" in lowered
+        or "filenotfounderror:" in lowered
+        or lowered.startswith("error:")
+    )
+
+
 def download_youtube_audio(url: str) -> str:
     try:
         import yt_dlp
@@ -149,6 +160,11 @@ def process_input(source: str) -> list:
 
     source = source.strip().strip("\"'“”‘’")
     source = source.replace("\u200b", "").replace("\ufeff", "")
+
+    if _looks_like_pasted_error_text(source):
+        raise ValueError(
+            "The input looks like pasted error text. Paste only a YouTube URL or a local file path."
+        )
 
     if source.startswith("http://") or source.startswith("https://"):
         print("Detected YouTube URL. Downloading audio...")

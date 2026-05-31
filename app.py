@@ -2,9 +2,9 @@ import streamlit as st
 import time
 import traceback
 from pathlib import Path
-from dotenv import load_dotenv
+from core.runtime_config import configure_runtime_environment
 
-load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
+configure_runtime_environment()
 from utils.audio_processor import process_input
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title

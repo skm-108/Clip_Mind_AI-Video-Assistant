@@ -54,7 +54,7 @@ flowchart LR
 |   |-- vector_store.py
 |-- utils/
 |   `-- audio_processor.py
-|-- Requirements.txt
+|-- requirements.txt
 |-- .env.example
 `-- README.md
 ```
@@ -64,7 +64,7 @@ flowchart LR
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r Requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
@@ -141,6 +141,8 @@ FFMPEG_BIN=C:\path\to\ffmpeg\bin
 WHISPER_MODEL=tiny
 SARVAM_STT_MODEL=saaras:v2.5
 ```
+
+For Streamlit Cloud, add the same values under app settings secrets instead of committing a `.env` file.
 
 ## Security Notes
 
