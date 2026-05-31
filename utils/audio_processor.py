@@ -124,31 +124,65 @@ def _looks_like_pasted_error_text(source: str) -> bool:
 def download_youtube_audio(url: str) -> str:
     try:
         import yt_dlp
+        from yt_dlp.utils import DownloadError
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "yt-dlp is required for YouTube downloads. Install dependencies with 'pip install -r requirements.txt'."
         ) from exc
 
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": output_path,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192",
-            }
-        ],
-        "quiet": True,
-    }
-    if FFMPEG_BIN:
-        ydl_opts["ffmpeg_location"] = FFMPEG_BIN
+    client_profiles = [
+        ["android"],
+        ["ios"],
+        ["web"],
+        ["tv"],
+        ["web_safari"],
+    ]
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
-    return filename
+    last_error = None
+    for client_profile in client_profiles:
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "wav",
+                    "preferredquality": "192",
+                }
+            ],
+            "quiet": True,
+            "noplaylist": True,
+            "retries": 3,
+            "fragment_retries": 3,
+            "http_headers": {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                ),
+                "Referer": "https://www.youtube.com/",
+                "Origin": "https://www.youtube.com",
+            },
+            "extractor_args": {"youtube": {"player_client": client_profile}},
+        }
+        if FFMPEG_BIN:
+            ydl_opts["ffmpeg_location"] = FFMPEG_BIN
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
+                return filename
+        except DownloadError as exc:
+            last_error = exc
+            continue
+
+    raise RuntimeError(
+        "YouTube download failed in this deployment environment. "
+        "The video may be blocked by YouTube or require browser cookies. "
+        "Try a different public video or upload a local file."
+    ) from last_error
 
 
 def convert_to_wav(input_path: str) -> str:
