@@ -109,7 +109,10 @@ def summarize(transcript : str) -> str:
 
     chunks = split_transcript(transcript)
 
-    chunk_summaries = [map_chain.invoke({"text" : chunk}) for chunk in chunks]
+    try:
+        chunk_summaries = [map_chain.invoke({"text" : chunk}) for chunk in chunks]
+    except Exception:
+        return _simple_summary(transcript)
 
     combined = "\n\n".join(chunk_summaries)
 
@@ -128,7 +131,10 @@ def summarize(transcript : str) -> str:
         RunnablePassthrough() | RunnableLambda(lambda x:{"text":x}) | combined_prompt | llm | StrOutputParser()
     )
 
-    return combined_chain.invoke(combined)
+    try:
+        return combined_chain.invoke(combined)
+    except Exception:
+        return _simple_summary(transcript)
 
 def generate_title(transcipt : str) -> str:
     # If Mistral API key is not set, return a simple heuristic title.
@@ -155,7 +161,10 @@ def generate_title(transcipt : str) -> str:
         | StrOutputParser()
     )
 
-    return title_chain.invoke(transcipt[:2000])
+    try:
+        return title_chain.invoke(transcipt[:2000])
+    except Exception:
+        return _simple_title(transcipt)
 
 
 

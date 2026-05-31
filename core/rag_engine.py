@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 from core.vector_store import build_vector_store, load_vector_store, get_retriever
@@ -25,6 +26,52 @@ def get_llm():
 def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
+
+def _fallback_answer(question: str, docs) -> str:
+    context = " ".join(doc.page_content for doc in docs[:4])
+    if not context.strip():
+        return "I could not find this information in the meeting transcript."
+
+    q_terms = [term for term in re.findall(r"[a-zA-Z0-9]+", question.lower()) if len(term) > 2]
+    if q_terms:
+        sentences = re.split(r'(?<=[.!?])\s+', context)
+        scored = []
+        for sentence in sentences:
+            lowered = sentence.lower()
+            score = sum(1 for term in q_terms if term in lowered)
+            if "?" in sentence:
+                score -= 1
+            if score:
+                scored.append((score, sentence.strip()))
+        if scored:
+            scored.sort(key=lambda item: (-item[0], len(item[1])))
+            answer = scored[0][1]
+            return answer if answer else "I could not find this information in the meeting transcript."
+
+    return context[:500] if context else "I could not find this information in the meeting transcript."
+
+
+class _FallbackRAGChain:
+    def __init__(self, retriever):
+        self._retriever = retriever
+
+    def invoke(self, question: str) -> str:
+        docs = self._retriever.invoke(question)
+        return _fallback_answer(question, docs)
+
+
+class _SafeRAGChain:
+    def __init__(self, rag_chain, retriever):
+        self._rag_chain = rag_chain
+        self._retriever = retriever
+
+    def invoke(self, question: str) -> str:
+        try:
+            return self._rag_chain.invoke(question)
+        except Exception:
+            docs = self._retriever.invoke(question)
+            return _fallback_answer(question, docs)
+
 def build_rag_chain(transcript:str):
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
@@ -34,7 +81,10 @@ def build_rag_chain(transcript:str):
 
     retriever = get_retriever(vector_store, k = 4)
 
-    llm = get_llm()
+    try:
+        llm = get_llm()
+    except Exception:
+        return _FallbackRAGChain(retriever)
 
     prompt = ChatPromptTemplate.from_messages(
 
@@ -65,7 +115,7 @@ Context from meeting transcript:
          |prompt|llm|StrOutputParser()
     )
 
-    return rag_chain
+    return _SafeRAGChain(rag_chain, retriever)
 
 
 def load_rag_chain():
@@ -76,7 +126,10 @@ def load_rag_chain():
     vector_store = load_vector_store()
     retriever = get_retriever(vector_store)
 
-    llm = get_llm()
+    try:
+        llm = get_llm()
+    except Exception:
+        return _FallbackRAGChain(retriever)
     prompt = ChatPromptTemplate.from_messages([
         (
             "system",
@@ -104,11 +157,21 @@ Context from meeting transcript:
         | StrOutputParser()
     )
 
-    return rag_chain
+    return _SafeRAGChain(rag_chain, retriever)
 
 
 def ask_question(rag_chain, question:str) -> str:
     print(f"Question : {question}")
-    answer = rag_chain.invoke(question)
+    try:
+        answer = rag_chain.invoke(question)
+    except Exception:
+        docs = []
+        retriever = getattr(rag_chain, "_retriever", None)
+        if retriever is not None:
+            try:
+                docs = retriever.invoke(question)
+            except Exception:
+                docs = []
+        answer = _fallback_answer(question, docs)
     print(f"answer :{answer}")
     return answer
