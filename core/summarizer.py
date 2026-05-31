@@ -1,9 +1,3 @@
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-
 import os 
 from pathlib import Path
 from dotenv import load_dotenv
@@ -11,6 +5,13 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
 def get_llm():
+    try:
+        from langchain_mistralai import ChatMistralAI
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "langchain-mistralai is required for summarization and title generation. Install dependencies with 'pip install -r requirements.txt'."
+        ) from exc
+
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY is not set in .env")
@@ -22,6 +23,8 @@ def get_llm():
 
 
 def split_transcript(transcript: str) -> list:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     splitter = RecursiveCharacterTextSplitter(
         chunk_size = 3000,
         chunk_overlap = 200
@@ -30,6 +33,10 @@ def split_transcript(transcript: str) -> list:
     return splitter.split_text(transcript)
 
 def summarize(transcript : str) -> str:
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+
     llm = get_llm()
 
     map_prompt = ChatPromptTemplate.from_messages(
@@ -65,6 +72,10 @@ def summarize(transcript : str) -> str:
     return combined_chain.invoke(combined)
 
 def generate_title(transcipt : str) -> str:
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+
     llm = get_llm()
 
     

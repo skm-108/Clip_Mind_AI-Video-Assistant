@@ -68,6 +68,22 @@ python -m venv .venv
 Copy-Item .env.example .env
 ```
 
+If you are setting up dependencies manually, use one of these sets of commands:
+
+```powershell
+# pip
+python -m pip install pydub audioop-lts python-dotenv
+
+# conda
+conda install -c conda-forge pydub python-dotenv
+
+# Python 3.13+ / 3.14 compatibility
+python -m pip install audioop-lts
+
+# ffmpeg on Windows
+winget install Gyan.FFmpeg
+```
+
 Edit .env and set your real keys:
 - MISTRAL_API_KEY
 - SARVAM_API_KEY (required only for hinglish mode)
@@ -80,6 +96,16 @@ Edit .env and set your real keys:
 ```
 
 Open: http://localhost:8501
+
+## Audio Smoke Test
+
+Run the bundled smoke test to verify `AudioSegment` can create, load, and export a WAV file:
+
+```powershell
+.\.venv\Scripts\python.exe audio_smoke_test.py
+```
+
+Expected output includes a `PASS` message. If it fails, install `pydub` and confirm FFmpeg is available in `PATH` or set `FFMPEG_BIN` in `.env`.
 
 ## CLI Mode
 

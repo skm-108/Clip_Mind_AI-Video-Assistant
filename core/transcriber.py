@@ -1,12 +1,15 @@
-import whisper
 import os
 import requests
 import wave
 from pathlib import Path
 
 import numpy as np
-from pydub import AudioSegment
 from dotenv import load_dotenv
+
+try:
+    from pydub import AudioSegment
+except ModuleNotFoundError:
+    AudioSegment = None
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
@@ -23,6 +26,15 @@ SARVAM_STT_TRANSLATE_URL = "https://api.sarvam.ai/speech-to-text-translate"
 SARVAM_MODEL = os.getenv("SARVAM_STT_MODEL", "saaras:v2.5")
 
 _model = None
+_whisper = None
+
+
+def _require_audio_segment():
+    if AudioSegment is None:
+        raise ModuleNotFoundError(
+            "pydub is required for Sarvam chunking. Install dependencies with 'pip install -r requirements.txt'."
+        )
+    return AudioSegment
 
 
 def _load_wav_for_whisper(chunk_path: str) -> np.ndarray:
@@ -56,11 +68,20 @@ def _load_wav_for_whisper(chunk_path: str) -> np.ndarray:
 
 def load_model():
 
-    global _model  
+    global _model, _whisper  
 
     if _model is None: 
+        if _whisper is None:
+            try:
+                import whisper as _whisper_module
+            except ModuleNotFoundError as exc:
+                raise ModuleNotFoundError(
+                    "openai-whisper is required for Whisper transcription. Install dependencies with 'pip install -r requirements.txt'."
+                ) from exc
+            _whisper = _whisper_module
+
         print(f"Loading Whisper model: {WHISPER_MODEL} ...")
-        _model = whisper.load_model(WHISPER_MODEL) 
+        _model = _whisper.load_model(WHISPER_MODEL) 
         print("Whisper model loaded.")
     return _model 
 
@@ -105,7 +126,8 @@ def transcribe_chunk_sarvam(chunk_path: str) -> str:
     if not SARVAM_API_KEY:
         raise RuntimeError("SARVAM_API_KEY is not set in environment / .env")
 
-    audio = AudioSegment.from_wav(chunk_path)
+    audio_segment = _require_audio_segment()
+    audio = audio_segment.from_wav(chunk_path)
     piece_ms = SARVAM_PIECE_SECONDS * 1000
 
     full_text = ""

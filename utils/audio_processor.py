@@ -38,17 +38,33 @@ FFMPEG_BIN = _resolve_ffmpeg_bin()
 if FFMPEG_BIN:
     os.environ["PATH"] = FFMPEG_BIN + os.pathsep + os.environ.get("PATH", "")
 
-import yt_dlp
-from pydub import AudioSegment
+try:
+    from pydub import AudioSegment
+except ModuleNotFoundError:
+    AudioSegment = None
 
 DOWNLOAD_DIR = "generated_audio"
 CHUNK_DIR = os.path.join(DOWNLOAD_DIR, "chunks")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(CHUNK_DIR, exist_ok=True)
 
-if FFMPEG_BIN:
+def _configure_pydub_ffmpeg() -> None:
+    if not AudioSegment or not FFMPEG_BIN:
+        return
+
     AudioSegment.converter = os.path.join(FFMPEG_BIN, "ffmpeg.exe")
     AudioSegment.ffprobe = os.path.join(FFMPEG_BIN, "ffprobe.exe")
+
+
+_configure_pydub_ffmpeg()
+
+
+def _require_audio_segment():
+    if AudioSegment is None:
+        raise ModuleNotFoundError(
+            "pydub is required for audio processing. Install dependencies with 'pip install -r requirements.txt'."
+        )
+    return AudioSegment
 
 
 def ensure_ffmpeg_available() -> None:
@@ -69,6 +85,13 @@ def _safe_stem(path: str, max_length: int = 48) -> str:
 
 
 def download_youtube_audio(url: str) -> str:
+    try:
+        import yt_dlp
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "yt-dlp is required for YouTube downloads. Install dependencies with 'pip install -r requirements.txt'."
+        ) from exc
+
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
     ydl_opts = {
         "format": "bestaudio/best",
@@ -94,15 +117,17 @@ def download_youtube_audio(url: str) -> str:
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     ensure_ffmpeg_available()
+    audio_segment = _require_audio_segment()
     output_path = os.path.join(DOWNLOAD_DIR, f"{_safe_stem(input_path)}_converted.wav")
-    audio = AudioSegment.from_file(input_path)
+    audio = audio_segment.from_file(input_path)
     audio = audio.set_channels(1).set_frame_rate(16000)
     audio.export(output_path, format="wav")
     return output_path
 
 
 def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
-    audio = AudioSegment.from_wav(wav_path)
+    audio_segment = _require_audio_segment()
+    audio = audio_segment.from_wav(wav_path)
     chunk_ms = chunk_minutes * 60 * 1000
 
     chunks = []

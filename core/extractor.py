@@ -1,9 +1,3 @@
-#Actionableitems , decision , questions 
-
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 import os 
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,6 +6,13 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=T
 
 
 def get_llm():
+    try:
+        from langchain_mistralai import ChatMistralAI
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "langchain-mistralai is required for action items, decisions, and question extraction. Install dependencies with 'pip install -r requirements.txt'."
+        ) from exc
+
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY is not set in .env")
@@ -24,6 +25,10 @@ def get_llm():
 
 
 def build_chain(system_prompt : str):
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+
     llm = get_llm()
     return (
         RunnablePassthrough() | RunnableLambda(lambda x : {"text" : x}) |ChatPromptTemplate.from_messages([

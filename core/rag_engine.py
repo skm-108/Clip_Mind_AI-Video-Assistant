@@ -1,15 +1,18 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from core.vector_store import build_vector_store, load_vector_store, get_retriever
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
 def get_llm():
+    try:
+        from langchain_mistralai import ChatMistralAI
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "langchain-mistralai is required for RAG chat. Install dependencies with 'pip install -r requirements.txt'."
+        ) from exc
+
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY is not set in .env")
@@ -23,6 +26,9 @@ def format_docs(docs):
     return "\n\n".join([doc.page_content for doc in docs])
 
 def build_rag_chain(transcript:str):
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
     vector_store = build_vector_store(transcript)
 
@@ -63,6 +69,10 @@ Context from meeting transcript:
 
 
 def load_rag_chain():
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+
     vector_store = load_vector_store()
     retriever = get_retriever(vector_store)
 
