@@ -5,6 +5,17 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
+_MISTRAL_DISABLED = False
+
+
+def _mistral_enabled() -> bool:
+    return bool(os.getenv("MISTRAL_API_KEY")) and not _MISTRAL_DISABLED
+
+
+def _disable_mistral() -> None:
+    global _MISTRAL_DISABLED
+    _MISTRAL_DISABLED = True
+
 
 def get_llm():
     try:
@@ -68,6 +79,8 @@ def build_chain(system_prompt : str):
     )
 
 def extract_action_items(transcript:str)->str:
+    if not _mistral_enabled():
+        return _fallback_action_items(transcript)
     try:
         chain = build_chain(
             "You are an expert meeting analyst. From the meeting transcript, "
@@ -79,10 +92,13 @@ def extract_action_items(transcript:str)->str:
         )
         return chain.invoke(transcript)
     except Exception:
+        _disable_mistral()
         return _fallback_action_items(transcript)
 
 
 def extract_key_decisions(transcript: str) -> str:
+    if not _mistral_enabled():
+        return _fallback_key_decisions(transcript)
     try:
         chain = build_chain(
             "You are an expert meeting analyst. From the meeting transcript, "
@@ -91,10 +107,13 @@ def extract_key_decisions(transcript: str) -> str:
         )
         return chain.invoke(transcript)
     except Exception:
+        _disable_mistral()
         return _fallback_key_decisions(transcript)
 
 
 def extract_questions(transcript: str) -> str:
+    if not _mistral_enabled():
+        return _fallback_questions(transcript)
     try:
         chain = build_chain(
             "From the meeting transcript, extract all unresolved questions "
@@ -103,4 +122,5 @@ def extract_questions(transcript: str) -> str:
         )
         return chain.invoke(transcript)
     except Exception:
+        _disable_mistral()
         return _fallback_questions(transcript)

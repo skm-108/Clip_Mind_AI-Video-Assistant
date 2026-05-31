@@ -6,6 +6,17 @@ from core.vector_store import build_vector_store, load_vector_store, get_retriev
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
+_MISTRAL_DISABLED = False
+
+
+def _mistral_enabled() -> bool:
+    return bool(os.getenv("MISTRAL_API_KEY")) and not _MISTRAL_DISABLED
+
+
+def _disable_mistral() -> None:
+    global _MISTRAL_DISABLED
+    _MISTRAL_DISABLED = True
+
 def get_llm():
     try:
         from langchain_mistralai import ChatMistralAI
@@ -81,9 +92,13 @@ def build_rag_chain(transcript:str):
 
     retriever = get_retriever(vector_store, k = 4)
 
+    if not _mistral_enabled():
+        return _FallbackRAGChain(retriever)
+
     try:
         llm = get_llm()
     except Exception:
+        _disable_mistral()
         return _FallbackRAGChain(retriever)
 
     prompt = ChatPromptTemplate.from_messages(
@@ -129,6 +144,7 @@ def load_rag_chain():
     try:
         llm = get_llm()
     except Exception:
+        _disable_mistral()
         return _FallbackRAGChain(retriever)
     prompt = ChatPromptTemplate.from_messages([
         (
@@ -165,6 +181,7 @@ def ask_question(rag_chain, question:str) -> str:
     try:
         answer = rag_chain.invoke(question)
     except Exception:
+        _disable_mistral()
         docs = []
         retriever = getattr(rag_chain, "_retriever", None)
         if retriever is not None:

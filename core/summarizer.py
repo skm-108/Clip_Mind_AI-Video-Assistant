@@ -5,6 +5,17 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=True)
 
+_MISTRAL_DISABLED = False
+
+
+def _mistral_enabled() -> bool:
+    return bool(os.getenv("MISTRAL_API_KEY")) and not _MISTRAL_DISABLED
+
+
+def _disable_mistral() -> None:
+    global _MISTRAL_DISABLED
+    _MISTRAL_DISABLED = True
+
 def get_llm():
     try:
         from langchain_mistralai import ChatMistralAI
@@ -89,7 +100,7 @@ def _simple_title(transcript: str, max_words: int = 8) -> str:
 
 def summarize(transcript : str) -> str:
     # If no Mistral API key is available, use a lightweight fallback.
-    if not os.getenv("MISTRAL_API_KEY"):
+    if not _mistral_enabled():
         return _simple_summary(transcript)
 
     from langchain_core.output_parsers import StrOutputParser
@@ -112,6 +123,7 @@ def summarize(transcript : str) -> str:
     try:
         chunk_summaries = [map_chain.invoke({"text" : chunk}) for chunk in chunks]
     except Exception:
+        _disable_mistral()
         return _simple_summary(transcript)
 
     combined = "\n\n".join(chunk_summaries)
@@ -134,11 +146,12 @@ def summarize(transcript : str) -> str:
     try:
         return combined_chain.invoke(combined)
     except Exception:
+        _disable_mistral()
         return _simple_summary(transcript)
 
 def generate_title(transcipt : str) -> str:
     # If Mistral API key is not set, return a simple heuristic title.
-    if not os.getenv("MISTRAL_API_KEY"):
+    if not _mistral_enabled():
         return _simple_title(transcipt)
 
     from langchain_core.output_parsers import StrOutputParser
@@ -164,6 +177,7 @@ def generate_title(transcipt : str) -> str:
     try:
         return title_chain.invoke(transcipt[:2000])
     except Exception:
+        _disable_mistral()
         return _simple_title(transcipt)
 
 
